@@ -3,8 +3,7 @@ export let playerId;
 
 import { Client } from 'boardgame.io/client';
 import { Local } from 'boardgame.io/multiplayer';
-import { TeamFive } from './Game.js'
-import { onMount } from 'svelte'
+import { TeamFive, count_cards } from './Game.js'
 import OpponentHand from './OpponentHand.svelte';
 import PlayerBoard from './PlayerBoard.svelte';
 import PlayerHand from './PlayerHand.svelte';
@@ -28,7 +27,6 @@ function update(state) {
     ctx = state.ctx;
 }
 
-console.log(playerId)
 let client = Client({
         game: TeamFive,
         multiplayer: Local(),
@@ -36,13 +34,12 @@ let client = Client({
     });
 client.start();
 client.subscribe(state => update(state));
-
-$: opponentId = (playerId+1)%2;
-$: opponentHandSize = gameState ? (gameState.players[opponentId].hand.reduce((prev, curr, ind, arr) => prev + curr, 0)) : 0 ;
+$: opponentId = `${(parseInt(playerId)+1)%2}`;
+$: opponentHandSize = gameState ? count_cards(gameState.players[opponentId].hand) : 0 ;
 $: opponentBoard = gameState ? gameState.players[opponentId].board : undefined;
 $: board = gameState ? gameState.players[playerId].board : undefined;
 $: hand = gameState ? gameState.players[playerId].hand : undefined;
-$: context = Object.keys(ctx).filter(k => !k.startsWith('_')).map((k)=> [k,ctx[k]]);
+$: askDefend = Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "defend";
 </script>
 <style>
     div {
@@ -50,14 +47,16 @@ $: context = Object.keys(ctx).filter(k => !k.startsWith('_')).map((k)=> [k,ctx[k
     }
 </style>
 <div>Player : {playerId}</div>
-{#each context as item}
-<div>{item[0]} : {item[1]}</div>
-{/each}
 {#if gameState}
 {#if ctx.currentPlayer==playerId}
 <h3>Your turn !</h3>
 {:else}
 <h3>Wait</h3>
+{/if}
+{#if askDefend}
+<h4>Block card ?</h4>
+<button>Yes !</button>
+<button>No</button>
 {/if}
 <div>
 <OpponentHand bind:nbCards={opponentHandSize}></OpponentHand>

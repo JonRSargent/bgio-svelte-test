@@ -2,11 +2,11 @@
 	import PlayerDisplay from './PlayerDisplay.svelte';
 
 	export let nbPlayers = 2;
-	const _players = new Array(nbPlayers).fill(0).map((v, i, a) => i);
+	const _players = new Array(nbPlayers).fill(0).map((_1, i, _3) => `${i}`);
 	$: players = _players;
 </script>
 
-<div id="app">
+<div id="app" class="app">
 	<h1>TeamFive</h1>
 	{#each players as playerId}
   		<PlayerDisplay playerId={playerId}></PlayerDisplay>
@@ -14,7 +14,7 @@
 </div>
 
 <style>
-	div {
+	.app {
 		text-align: center;
 		padding: 1em;
 		max-width: 240px;
@@ -29,7 +29,7 @@
 	}
 
 	@media (min-width: 640px) {
-		div {
+		.app {
 			max-width: none;
 		}
 	}

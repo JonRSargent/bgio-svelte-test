@@ -25,7 +25,11 @@ const cardEffect = [
 ];
 
 function opponent(ctx) {
-    return (ctx.currentPlayer + 1) % 2;
+    return `${(parseInt(ctx.currentPlayer)+1)%2}`;
+}
+
+export function count_cards(pack) {
+    return pack.reduce((a, b) => a + b, 0);
 }
 
 function Draw(G, ctx, player_id) {
@@ -34,7 +38,10 @@ function Draw(G, ctx, player_id) {
 }
 
 function Disband(G, ctx) {
-    ctx.events.setStage("disband");
+    let opponentId = opponent(ctx)
+    if (count_cards(G.players[opponentId].board)>0) {
+        ctx.events.setActivePlayers({ currentPlayer: 'disband', moveLimit: 1, revert: true});
+    }
 }
 
 function PickDisband(G, ctx, target_id) {
@@ -49,7 +56,7 @@ function Raise(G, ctx) {
 }
 
 function PickRaise(G, ctx, card_id) {
-    if (G.discard.reduce((a, b) => a + b, 0) === 0) {
+    if (count_cards(G.discard) == 0) {
         ctx.events.endTurn();
     }
     else if (G.discard[card_id] === 0) {
@@ -62,7 +69,10 @@ function PickRaise(G, ctx, card_id) {
 }
 
 function Discard(G, ctx) {
-    ctx.events.setActivePlayers({ others: 'pickdiscard', moveLimit: 1, revert: true });
+    let opponentId = opponent(ctx)
+    if (count_cards(G.players[opponentId].hand)>0) {
+        ctx.events.setActivePlayers({ others: 'discard', moveLimit: 1, revert: true });
+    }
 }
 
 function PickDiscard(G, ctx, card_id) {
@@ -72,19 +82,22 @@ function PickDiscard(G, ctx, card_id) {
     G.players[ctx.currentPlayer].hand[card_id] -= 1;
 }
 
-function Defend(G, ctx) {
+function CanDefend(G, ctx) {
     let opponentId = opponent(ctx)
     if (G.players[opponentId].board[Heroes.Witch] === 1) {
-        ctx.events.setActivePlayers({ others: 'askdefend', moveLimit: 1 });
+        ctx.events.setActivePlayers({ others: 'defend', moveLimit: 1, revert: true });
+        return true;
+    } else {
+        return false;
     }
 }
 
-function AskDefend(G, ctx, do_defend) {
-    if (do_defend) {
-        ctx.events.setStage("endturn")
-    } else {
-        ctx.events.setStage("cardeffect")
-    }
+function Defend(G, ctx) {
+    ctx.events.endStage()
+}
+
+function SkipDefend(G, ctx) {
+    ctx.events.setStage()
 }
 
 function PlayCard(G, ctx, card_id) {
@@ -92,12 +105,10 @@ function PlayCard(G, ctx, card_id) {
         return INVALID_MOVE;
     }
     G.players[ctx.currentPlayer].hand[card_id] -= 1;
-    Defend(G, ctx)
-    cardEffect[card_id](G, ctx)
-    G.players[ctx.currentPlayer].board[card_id] += 1;
-    let opponentId = opponent(ctx)
-    // ctx.events.endTurn();
-    // ctx.events.setActivePlayers(opponentId);
+    if (!CanDefend(G, ctx)) {
+        cardEffect[card_id](G, ctx)
+        G.players[ctx.currentPlayer].board[card_id] += 1;
+    }
 }
 
 export const TeamFive = {
@@ -134,10 +145,7 @@ export const TeamFive = {
             moves: { 'PlayCard': PlayCard },
             stages: {
                 defend: {
-                    moves: { 'Defend': Defend },
-                },
-                askdefend: {
-                    moves: { 'AskDefend': AskDefend },
+                    moves: { 'Defend': Defend, SkipDefend },
                 },
                 raise: {
                     moves: { 'PickRaise': PickRaise },

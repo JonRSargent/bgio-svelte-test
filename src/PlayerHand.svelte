@@ -2,9 +2,9 @@
     export let hand;
     export let client;
 
-    import { Heroes, HeroesNames } from './Game.js'
+    import { HeroesNames } from './Game.js'
 
-    $: expandedHand = hand.flatMap((v, i, a) => new Array(v).fill(i));
+    $: expandedHand = hand.flatMap((v, i, _3) => new Array(v).fill(i));
 
     function handleClick(item) {
         let cardId = item.target.attributes["data-id"].value
@@ -12,10 +12,10 @@
     }
 </script>
 <style>
-    div {
+    .container {
         display:inline-flex;
     }
-    p {
+    .card {
         display:inline-flex;
         height: 3.28cm;
         width: 2.32cm;
@@ -28,7 +28,7 @@
         align-items: center;
     }
 </style>
-<div>
+<div class="container">
 {#each expandedHand as card}
     <p class="card" data-id={card} on:click="{handleClick}">{HeroesNames[card]}</p>
 {/each}
