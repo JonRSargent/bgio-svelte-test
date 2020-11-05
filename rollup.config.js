@@ -59,7 +59,7 @@ export default {
 		commonjs(),
 
 		replace({
-			include: 'src/**',
+			include: production ? ['src/**'] : ['src/**','node_modules/boardgame.io/**' ],
 			'process.env.NODE_ENV': JSON.stringify('development'),
 		  }),
 		replace({
