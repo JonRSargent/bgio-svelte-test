@@ -11,14 +11,14 @@ This is built upon the official project template for [Svelte](https://svelte.dev
 The goal is to have a local multiplayer demo using the svelte framework.
 This is a reimplementation of a flash game.
 
-When starting from the svelte template, an important step is to add the following the `rollup.config.js`
+When starting from the svelte template, an important step is to add the following the `rollup.config.js` for the app to work and to have the boardgame.io Debug panel:
 ```
 import replace from 'rollup-plugin-replace';
 (...)
 plugins: [
     (...)
 		replace({
-			include: 'src/**',
+			include: production ? ['src/**'] : ['src/**','node_modules/boardgame.io/**' ],
 			'process.env.NODE_ENV': JSON.stringify('development'),
 		  }),
 		replace({
