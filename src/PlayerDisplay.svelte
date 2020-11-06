@@ -34,12 +34,29 @@ let client = Client({
     });
 client.start();
 client.subscribe(state => update(state));
+
+function handleDefend() {
+    let activePlayers = client.getState().ctx.activePlayers;
+    if(activePlayers && activePlayers[playerId] == "defend") {   
+        client.moves.Defend(); 
+    }
+}
+
+function handleSkipDefend() {
+    let activePlayers = client.getState().ctx.activePlayers;
+    if(activePlayers && activePlayers[playerId] == "defend") {   
+        client.moves.SkipDefend(); 
+    }
+}
+
 $: opponentId = `${(parseInt(playerId)+1)%2}`;
 $: opponentHandSize = gameState ? count_cards(gameState.players[opponentId].hand) : 0 ;
 $: opponentBoard = gameState ? gameState.players[opponentId].board : undefined;
 $: board = gameState ? gameState.players[playerId].board : undefined;
 $: hand = gameState ? gameState.players[playerId].hand : undefined;
-$: askDefend = Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "defend";
+$: askDefend = ctx.activePlayers && Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "defend";
+$: askDiscard = ctx.activePlayers && Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "discard";
+$: moves = Object.keys(client.moves);
 </script>
 <style>
     div {
@@ -50,13 +67,17 @@ $: askDefend = Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePl
 {#if gameState}
 {#if ctx.currentPlayer==playerId}
 <h3>Your turn !</h3>
+<div>{moves}</div>
 {:else}
 <h3>Wait</h3>
 {/if}
 {#if askDefend}
 <h4>Block card ?</h4>
-<button>Yes !</button>
-<button>No</button>
+<button on:click={handleDefend}>Yes !</button>
+<button on:click={handleSkipDefend}>No</button>
+{/if}
+{#if askDiscard}
+<h4>Please discard !</h4>
 {/if}
 <div>
 <OpponentHand bind:nbCards={opponentHandSize}></OpponentHand>
@@ -65,9 +86,9 @@ $: askDefend = Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePl
 <PlayerBoard board={opponentBoard}></PlayerBoard>
 </div>
 <div>
-<PlayerBoard board={board}></PlayerBoard>
+<PlayerBoard {board}></PlayerBoard>
 </div>
 <div>
-<PlayerHand client={client} hand={hand}></PlayerHand>
+<PlayerHand {playerId} {client} {hand}></PlayerHand>
 </div>
 {/if}

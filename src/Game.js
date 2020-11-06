@@ -1,5 +1,9 @@
 import { INVALID_MOVE, ActivePlayers } from 'boardgame.io/core';
 
+export const NO_DISCARD = "NO_DISCARD";
+export const NO_ENEMY = "NO_ENEMY"
+
+
 export const Heroes = {
     Scout: 0,
     Warrior: 1,
@@ -16,17 +20,33 @@ export const HeroesNames = [
     "Witch",
 ]
 
+export const Descriptions = [
+    "Scout",
+    "Warrior",
+    "Necro",
+    "Thief",
+    "Witch",
+]
+
 const cardEffect = [
-    (G, ctx) => { Draw(G, ctx, ctx.currentPlayer) }, // Scout : Draw one card
-    (G, ctx) => { Disband(G, ctx) }, // Warrior : Force disband
-    (G, ctx) => { Raise(G, ctx) }, // Necro : Draw from the discard
-    (G, ctx) => { Discard(G, ctx) }, // Thief : Force discard    
-    (G, ctx) => { }, // Witch : Provide defense at the cost of 1 card & the witch
+    (G, ctx) => { EffectDraw(G, ctx, ctx.currentPlayer) }, // Scout : Draw one card
+    (G, ctx) => { EffectDisband(G, ctx) }, // Warrior : Force disband
+    (G, ctx) => { EffectRaise(G, ctx) }, // Necro : Draw from the discard
+    (G, ctx) => { EffectDiscard(G, ctx) }, // Thief : Force discard    
+    (G, ctx) => { ctx.events.endTurn(); }, // Witch : Provide defense at the cost of 1 card & the witch
 ];
 
 function opponent(ctx) {
     return `${(parseInt(ctx.currentPlayer)+1)%2}`;
 }
+
+function activePlayer(ctx) {
+    if (ctx.activePlayers) {
+        return Object.keys(ctx.activePlayers).filter(k => ctx.activePlayers[k]!=null)[0];
+    }
+    return null;
+}
+
 
 export function count_cards(pack) {
     return pack.reduce((a, b) => a + b, 0);
@@ -37,78 +57,121 @@ function Draw(G, ctx, player_id) {
     G.players[player_id].hand[card_id] += 1;
 }
 
-function Disband(G, ctx) {
+function EffectDraw(G, ctx, player_id) {
+    Draw(G, ctx, player_id);
+    ctx.events.endTurn();
+}
+
+function EffectDisband(G, ctx) {
     let opponentId = opponent(ctx)
     if (count_cards(G.players[opponentId].board)>0) {
-        ctx.events.setActivePlayers({ currentPlayer: 'disband', moveLimit: 1, revert: true});
+        ctx.events.setActivePlayers({ currentPlayer: "disband", moveLimit: 1});
+    }    
+    else {
+        G.message = NO_ENEMY;
     }
 }
 
-function PickDisband(G, ctx, target_id) {
+function EffectRaise(G, ctx) {
+    if (count_cards(G.discard) > 0) {
+        ctx.events.setActivePlayers({ currentPlayer: "raise", moveLimit: 1});
+    }
+    else {
+        G.message = NO_DISCARD;
+    }
+}
+
+function EffectDiscard(G, ctx) {
     let opponentId = opponent(ctx)
-    if (G.players[opponentId].board[target_id] === 0)
+    if (count_cards(G.players[opponentId].hand)>0) {
+        ctx.events.setActivePlayers({ others: 'discard', moveLimit: 1 });
+    }
+}
+
+function MoveDisband(G, ctx, target_id) {
+    let opponentId = opponent(ctx)
+    if (G.players[opponentId].board[target_id] == 0)
         return INVALID_MOVE;
     G.players[opponentId].board[target_id] = 0;
+    ctx.events.endTurn();
 }
 
-function Raise(G, ctx) {
-    ctx.events.setStage("raise");
-}
-
-function PickRaise(G, ctx, card_id) {
+function MoveRaise(G, ctx, card_id) {
     if (count_cards(G.discard) == 0) {
-        ctx.events.endTurn();
+        return;
     }
-    else if (G.discard[card_id] === 0) {
+    else if (G.discard[card_id] == 0) {
         return INVALID_MOVE;
     }
     else {
         G.discard[card_id] -= 1;
         G.players[ctx.currentPlayer].hand[card_id] += 1;
     }
+    ctx.events.endTurn();
 }
 
-function Discard(G, ctx) {
-    let opponentId = opponent(ctx)
-    if (count_cards(G.players[opponentId].hand)>0) {
-        ctx.events.setActivePlayers({ others: 'discard', moveLimit: 1, revert: true });
-    }
-}
-
-function PickDiscard(G, ctx, card_id) {
-    if (G.players[ctx.currentPlayer].hand[card_id] === 0) {
+function MoveDiscard(G, ctx, card_id) {
+    let playerId = activePlayer(ctx);
+    if (G.players[playerId].hand[card_id] == 0) {
         return INVALID_MOVE;
     }
-    G.players[ctx.currentPlayer].hand[card_id] -= 1;
+    G.players[playerId].hand[card_id] -= 1;
+    G.discard[card_id] += 1;
+    ctx.events.endTurn();
 }
 
 function CanDefend(G, ctx) {
     let opponentId = opponent(ctx)
-    if (G.players[opponentId].board[Heroes.Witch] === 1) {
-        ctx.events.setActivePlayers({ others: 'defend', moveLimit: 1, revert: true });
+    if (G.players[opponentId].board[Heroes.Witch] == 1) {
+        ctx.events.setActivePlayers({ others: 'defend', moveLimit: 1});
         return true;
     } else {
         return false;
     }
 }
 
-function Defend(G, ctx) {
-    ctx.events.endStage()
+function MoveDefend(G, ctx) {
+    activePlayer(ctx).board[Heroes.Witch] = 0;
+    G.discard[Heroes.Witch] += 1;
+    G.discard[G.played_card] += 1;
+    G.played_card = undefined;
+    ctx.events.endTurn();
 }
 
-function SkipDefend(G, ctx) {
-    ctx.events.setStage()
+function MoveSkipDefend(G, ctx) {
+    ApplyCardEffect(G, ctx);
 }
 
-function PlayCard(G, ctx, card_id) {
-    if (G.players[ctx.currentPlayer].hand[card_id] === 0) {
+function MovePlayCard(G, ctx, card_id) {
+    if (G.players[ctx.currentPlayer].hand[card_id] == 0) {
         return INVALID_MOVE;
     }
+    G.played_card = card_id;
     G.players[ctx.currentPlayer].hand[card_id] -= 1;
     if (!CanDefend(G, ctx)) {
-        cardEffect[card_id](G, ctx)
-        G.players[ctx.currentPlayer].board[card_id] += 1;
+        ApplyCardEffect(G, ctx)
     }
+}
+
+function ApplyCardEffect(G, ctx) {
+    let card_id = G.played_card;
+    cardEffect[card_id](G, ctx)
+    if(G.players[ctx.currentPlayer].board[card_id] == 1) {
+        G.discard[card_id] += 1;
+    }
+    else {
+        G.players[ctx.currentPlayer].board[card_id] = 1;
+    }    
+    G.played_card = undefined;
+}
+
+// Useless, because it is checked before move is applied
+function CheckEndTurn(G, ctx) {
+    if (!ctx.activePlayers ||
+        !Object.keys(ctx.activePlayers).map(k => ctx.activePlayers[k]).filter(k=>k)[0]) {
+        return true;
+    }
+    return false;
 }
 
 export const TeamFive = {
@@ -125,39 +188,38 @@ export const TeamFive = {
             },      
             discard: Array(5).fill(0) 
         }),
-    turn: { 
-        moveLimit: 1, 
-        activePlayers: ActivePlayers.ALL,
-    },
     phases: {
         setup: {
             start: true,
             moveLimit: 0,
             onEnd: (G, ctx) => { ctx.playOrder.forEach(i => { Draw(G, ctx, parseInt(i)); Draw(G, ctx, parseInt(i)) }); },
             endIf: (G, ctx) => true,
-            next: "turn",
         },
-        turn: {
-            onBegin: (G, ctx) => { 
-                Draw(G, ctx, parseInt(ctx.currentPlayer));
-             },
-            moveLimit: 1,
-            moves: { 'PlayCard': PlayCard },
-            stages: {
-                defend: {
-                    moves: { 'Defend': Defend, SkipDefend },
-                },
-                raise: {
-                    moves: { 'PickRaise': PickRaise },
-                },
-                disband: {
-                    moves: { 'PickDisband': PickDisband },
-                },
-                discard: {
-                    moves: { 'PickDiscard': PickDiscard },
-                },
+    },    
+    turn: {
+        onBegin: (G, ctx) => { 
+            G.message = null;
+            Draw(G, ctx, parseInt(ctx.currentPlayer));
+            ctx.events.setActivePlayers({value: { [ctx.currentPlayer]: "play" } });
+        },
+        endIf: CheckEndTurn,
+        stages: {
+            play: {
+                moves: { 'PlayCard': MovePlayCard },
             },
-        }
-    },
+            defend: {
+                moves: { 'Defend': MoveDefend, "SkipDefend": MoveSkipDefend },
+            },
+            raise: {
+                moves: { 'Raise': MoveRaise },
+            },
+            disband: {
+                moves: { 'Disband': MoveDisband },
+            },
+            discard: {
+                moves: { 'Discard': MoveDiscard },
+            },
+        },
+    }
     
 };

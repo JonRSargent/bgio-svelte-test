@@ -1,4 +1,6 @@
 <script>
+
+    export let playerId;
     export let hand;
     export let client;
 
@@ -7,8 +9,15 @@
     $: expandedHand = hand.flatMap((v, i, _3) => new Array(v).fill(i));
 
     function handleClick(item) {
-        let cardId = item.target.attributes["data-id"].value
-        client.moves.PlayCard(cardId)
+        let cardId = item.target.attributes["data-id"].value;
+        let activePlayers = client.getState().ctx.activePlayers;
+        if(activePlayers && activePlayers[playerId] == "discard") {   
+            client.moves.Discard(cardId); 
+        }
+        else {
+            client.moves.PlayCard(cardId);
+        }
+
     }
 </script>
 <style>
