@@ -1,7 +1,9 @@
 import { INVALID_MOVE, ActivePlayers } from 'boardgame.io/core';
 
 export const NO_DISCARD = "NO_DISCARD";
-export const NO_ENEMY = "NO_ENEMY"
+export const NO_BOARD = "NO_BOARD"
+export const NO_HAND = "NO_HAND"
+
 
 
 export const Heroes = {
@@ -19,6 +21,15 @@ export const HeroesNames = [
     "Thief",
     "Witch",
 ]
+
+export const HeroesPlurals = [
+    "Scouts",
+    "Warriors",
+    "Necros",
+    "Thieves",
+    "Witches",
+]
+
 
 export const Descriptions = [
     "Scout",
@@ -65,26 +76,32 @@ function EffectDraw(G, ctx, player_id) {
 function EffectDisband(G, ctx) {
     let opponentId = opponent(ctx)
     if (count_cards(G.players[opponentId].board)>0) {
-        ctx.events.setActivePlayers({ currentPlayer: "disband", moveLimit: 1});
+        ctx.events.setActivePlayers({ currentPlayer: "disband", minMoves: 1, maxMoves: 1});
     }    
     else {
-        G.message = NO_ENEMY;
+        G.message = NO_BOARD;
+        ctx.events.endTurn();
     }
 }
 
 function EffectRaise(G, ctx) {
     if (count_cards(G.discard) > 0) {
-        ctx.events.setActivePlayers({ currentPlayer: "raise", moveLimit: 1});
+        ctx.events.setActivePlayers({ currentPlayer: "raise", minMoves: 1, maxMoves: 1});
     }
     else {
         G.message = NO_DISCARD;
+        ctx.events.endTurn();
     }
 }
 
 function EffectDiscard(G, ctx) {
     let opponentId = opponent(ctx)
     if (count_cards(G.players[opponentId].hand)>0) {
-        ctx.events.setActivePlayers({ others: 'discard', moveLimit: 1 });
+        ctx.events.setActivePlayers({ others: 'discard', minMoves: 1, maxMoves: 1 });
+    }
+    else {
+        G.message = NO_HAND;
+        ctx.events.endTurn();
     }
 }
 
@@ -93,12 +110,12 @@ function MoveDisband(G, ctx, target_id) {
     if (G.players[opponentId].board[target_id] == 0)
         return INVALID_MOVE;
     G.players[opponentId].board[target_id] = 0;
+    G.discard[target_id] += 1;
     ctx.events.endTurn();
 }
 
 function MoveRaise(G, ctx, card_id) {
     if (count_cards(G.discard) == 0) {
-        return;
     }
     else if (G.discard[card_id] == 0) {
         return INVALID_MOVE;
@@ -123,7 +140,7 @@ function MoveDiscard(G, ctx, card_id) {
 function CanDefend(G, ctx) {
     let opponentId = opponent(ctx)
     if (G.players[opponentId].board[Heroes.Witch] == 1) {
-        ctx.events.setActivePlayers({ others: 'defend', moveLimit: 1});
+        ctx.events.setActivePlayers({ others: 'defend', minMoves: 1, maxMoves: 1});
         return true;
     } else {
         return false;
@@ -131,7 +148,8 @@ function CanDefend(G, ctx) {
 }
 
 function MoveDefend(G, ctx) {
-    activePlayer(ctx).board[Heroes.Witch] = 0;
+    let playerId = activePlayer(ctx)
+    G.players[playerId].board[Heroes.Witch] = 0;
     G.discard[Heroes.Witch] += 1;
     G.discard[G.played_card] += 1;
     G.played_card = undefined;
@@ -165,15 +183,6 @@ function ApplyCardEffect(G, ctx) {
     G.played_card = undefined;
 }
 
-// Useless, because it is checked before move is applied
-function CheckEndTurn(G, ctx) {
-    if (!ctx.activePlayers ||
-        !Object.keys(ctx.activePlayers).map(k => ctx.activePlayers[k]).filter(k=>k)[0]) {
-        return true;
-    }
-    return false;
-}
-
 export const TeamFive = {
     setup: () => ({
             players: {
@@ -202,7 +211,6 @@ export const TeamFive = {
             Draw(G, ctx, parseInt(ctx.currentPlayer));
             ctx.events.setActivePlayers({value: { [ctx.currentPlayer]: "play" } });
         },
-        endIf: CheckEndTurn,
         stages: {
             play: {
                 moves: { 'PlayCard': MovePlayCard },
@@ -220,6 +228,10 @@ export const TeamFive = {
                 moves: { 'Discard': MoveDiscard },
             },
         },
+        onEnd: (G, ctx) => {
+            if(G && count_cards(G.players[ctx.currentPlayer].board) == 5)
+                ctx.events.endGame(ctx.currentPlayer);
+        }
     }
     
 };

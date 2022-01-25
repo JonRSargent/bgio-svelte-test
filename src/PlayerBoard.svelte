@@ -1,7 +1,24 @@
 <script>
     export let board;
-    import { Heroes, HeroesNames } from './Game.js'
+    export let ownerId;
+    export let client;
 
+    import { Heroes, HeroesNames } from './Game.js'
+    const _indices = new Array(HeroesNames.length).fill(0).map((_1, i, _3) => i);
+	$: cards = _indices;
+
+    function handleClick(item) {
+        let cardId = item.target.attributes["data-id"].value;
+        let currentPlayer = client.getState().ctx.currentPlayer;
+        let activePlayers = client.getState().ctx.activePlayers;
+        if(activePlayers && activePlayers[currentPlayer] == "disband" && ownerId != currentPlayer) {   
+            client.moves.Disband(cardId); 
+        }
+        else {
+            client.moves.PlayCard(cardId);
+        }
+
+    }
 </script>
 <style>
     div {
@@ -24,9 +41,9 @@
     }
 </style>
 <div>
-{#each HeroesNames as hero}
-    {#if board[Heroes[hero]] > 0}
-        <p class="card">{hero}</p>
+{#each cards as card}
+    {#if board[card] > 0}
+        <p class="card" data-id={card} on:click="{handleClick}">{HeroesNames[card]}</p>
     {:else}
         <p></p>
     {/if}

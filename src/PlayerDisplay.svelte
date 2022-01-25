@@ -7,6 +7,7 @@ import { TeamFive, count_cards } from './Game.js'
 import OpponentHand from './OpponentHand.svelte';
 import PlayerBoard from './PlayerBoard.svelte';
 import PlayerHand from './PlayerHand.svelte';
+import Discard from './Discard.svelte';
 
 let ctx = {};
 let gameState = {
@@ -19,7 +20,8 @@ let gameState = {
             board: [ 1, 0, 1, 0, 0 ],
             hand: [ 0, 1, 0, 1, 0 ],
         }
-    }
+    },
+    discard: [ 0, 0, 0, 0, 0 ]
 };
 
 function update(state) {
@@ -54,6 +56,9 @@ $: opponentHandSize = gameState ? count_cards(gameState.players[opponentId].hand
 $: opponentBoard = gameState ? gameState.players[opponentId].board : undefined;
 $: board = gameState ? gameState.players[playerId].board : undefined;
 $: hand = gameState ? gameState.players[playerId].hand : undefined;
+$: discard = gameState ? gameState.discard : undefined;
+$: askDisband = ctx.activePlayers && Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "disband";
+$: askRaise = ctx.activePlayers && Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "raise";
 $: askDefend = ctx.activePlayers && Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "defend";
 $: askDiscard = ctx.activePlayers && Object.keys(ctx.activePlayers).includes(playerId) && ctx.activePlayers[playerId] == "discard";
 $: moves = Object.keys(client.moves);
@@ -79,14 +84,23 @@ $: moves = Object.keys(client.moves);
 {#if askDiscard}
 <h4>Please discard !</h4>
 {/if}
+{#if askRaise}
+<h4>Please pick from discard !</h4>
+{/if}
+{#if askDisband}
+<h4>Please pick from opponent board !</h4>
+{/if}
+<div style="float: left" >
+    <Discard {playerId} {discard} {client}></Discard>
+</div>
 <div>
 <OpponentHand bind:nbCards={opponentHandSize}></OpponentHand>
 </div>
 <div>
-<PlayerBoard board={opponentBoard}></PlayerBoard>
+<PlayerBoard ownerId={opponentId} board={opponentBoard} {client}></PlayerBoard>
 </div>
 <div>
-<PlayerBoard {board}></PlayerBoard>
+<PlayerBoard ownerId={playerId} {board} {client}></PlayerBoard>
 </div>
 <div>
 <PlayerHand {playerId} {client} {hand}></PlayerHand>
